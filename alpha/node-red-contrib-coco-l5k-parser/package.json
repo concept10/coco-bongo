@@ -5,8 +5,14 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "node-red",
+    "l5k",
+    "rockwell",
+    "allen-bradley",
+    "logix"
+  ],
+  "author": "concept10",
   "license": "Apache-2.0",
   "description": "Node-RED node for parsing L5K files",
 }
