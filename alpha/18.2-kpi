@@ -1,0 +1,132 @@
+# Import necessary modules
+from java.util import Calendar
+from system.dataset import toPyDataSet
+from system.db import runPrepQuery
+
+# Define the time range for analysis (e.g., last 7 days)
+end_time = Calendar.getInstance()
+start_time = Calendar.getInstance()
+start_time.add(Calendar.DAY_OF_MONTH, -7)
+
+# Convert to SQL timestamp format
+start_timestamp = system.db.dateFormat(start_time.time, "yyyy-MM-dd HH:mm:ss")
+end_timestamp = system.db.dateFormat(end_time.time, "yyyy-MM-dd HH:mm:ss")
+
+# Query to retrieve alarm events from the Alarm Journal
+query = """
+    SELECT
+        eventtime,
+        displaypath,
+        source,
+        priority,
+        eventtype,
+        acktime,
+        cleartime
+    FROM alarm_events
+    WHERE eventtime BETWEEN ? AND ?
+"""
+
+# Execute the query
+params = [start_timestamp, end_timestamp]
+results = runPrepQuery(query, params)
+
+# Convert results to a Python dataset
+alarm_events = toPyDataSet(results)
+
+# Initialize variables for KPI calculations
+total_alarms = 0
+alarm_counts = {}
+acknowledged_alarms = 0
+cleared_alarms = 0
+stale_alarms = 0
+shelved_alarms = 0
+out_of_service_alarms = 0
+chattering_alarms = {}
+priority_distribution = {}
+
+# Define thresholds
+stale_threshold_minutes = 60  # Alarms active for more than 60 minutes
+chatter_threshold_count = 3   # Alarms occurring more than 3 times in a minute
+
+# Process each alarm event
+for event in alarm_events:
+    total_alarms += 1
+    event_time = event['eventtime']
+    source = event['source']
+    priority = event['priority']
+    event_type = event['eventtype']
+    ack_time = event['acktime']
+    clear_time = event['cleartime']
+
+    # Count alarms per source
+    if source not in alarm_counts:
+        alarm_counts[source] = 0
+    alarm_counts[source] += 1
+
+    # Count acknowledged alarms
+    if ack_time is not None:
+        acknowledged_alarms += 1
+
+    # Count cleared alarms
+    if clear_time is not None:
+        cleared_alarms += 1
+
+    # Check for stale alarms
+    if clear_time is None:
+        active_duration = (system.date.now().getTime() - event_time.getTime()) / 60000  # in minutes
+        if active_duration > stale_threshold_minutes:
+            stale_alarms += 1
+
+    # Check for chattering alarms
+    if source not in chattering_alarms:
+        chattering_alarms[source] = []
+    chattering_alarms[source].append(event_time)
+
+    # Count priority distribution
+    if priority not in priority_distribution:
+        priority_distribution[priority] = 0
+    priority_distribution[priority] += 1
+
+# Calculate chattering alarms
+chattering_alarm_count = 0
+for source, times in chattering_alarms.items():
+    times.sort()
+    for i in range(len(times) - chatter_threshold_count + 1):
+        if (times[i + chatter_threshold_count - 1].getTime() - times[i].getTime()) / 60000 <= 1:
+            chattering_alarm_count += 1
+            break
+
+# Calculate average alarm rate (alarms per 10 minutes)
+total_duration_minutes = (end_time.getTimeInMillis() - start_time.getTimeInMillis()) / 60000
+average_alarm_rate = (total_alarms / total_duration_minutes) * 10
+
+# Calculate maximum alarm rate in any 10-minute window
+time_window = 10  # minutes
+window_counts = []
+for i in range(0, int(total_duration_minutes), time_window):
+    window_start = start_time.timeInMillis + (i * 60000)
+    window_end = window_start + (time_window * 60000)
+    count = sum(1 for event in alarm_events if window_start <= event['eventtime'].getTime() < window_end)
+    window_counts.append(count)
+max_alarm_rate = max(window_counts)
+
+# Calculate alarm flood percentage
+flood_threshold = 10  # alarms per 10 minutes
+flood_periods = sum(1 for count in window_counts if count > flood_threshold)
+alarm_flood_percentage = (flood_periods / len(window_counts)) * 100
+
+# Calculate priority distribution percentages
+for priority in priority_distribution:
+    priority_distribution[priority] = (priority_distribution[priority] / total_alarms) * 100
+
+# Display KPIs
+print("Average Alarm Rate: {:.2f} alarms per 10 minutes".format(average_alarm_rate))
+print("Maximum Alarm Rate: {} alarms in a 10-minute period".format(max_alarm_rate))
+print("Alarm Flood Percentage: {:.2f}%".format(alarm_flood_percentage))
+print("Number of Stale Alarms: {}".format(stale_alarms))
+print("Alarm Priority Distribution:")
+for priority, percentage in priority_distribution.items():
+    print("  Priority {}: {:.2f}%".format(priority, percentage))
+print("Number of Chattering Alarms: {}".format(chattering_alarm_count))
+print("Number of Acknowledged Alarms: {}".format(acknowledged_alarms))
+print("Number of Cleared Alarms: {}".format(cleared_alarms))
