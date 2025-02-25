@@ -1,0 +1,28 @@
+<script type="text/javascript">
+    RED.nodes.registerType('coco-l5k', {
+        category: 'input',
+        color: '#a6bbcf',
+        defaults: {
+            name: { value: "" }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "file.png",
+        label: function () {
+            return this.name || "COCO L5K";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="coco-l5k">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Node Name">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="coco-l5k">
+    <p>Parses an .L5K file and extracts controller info, programs, and tags.</p>
+    <p><b>Input:</b> File path in <code>msg.payload</code></p>
+    <p><b>Output:</b> JSON object with parsed controller data</p>
+</script>
