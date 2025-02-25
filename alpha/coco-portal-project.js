@@ -1,5 +1,5 @@
 module.exports = function (RED) {
-    function CocoTIAParserNode(config) {
+    function CocoPortalProjectParser(config) {
         RED.nodes.createNode(this, config);
         var node = this;
         const fs = require("fs");
@@ -50,5 +50,5 @@ module.exports = function (RED) {
         });
     }
 
-    RED.nodes.registerType("coco-tia", CocoTIAParserNode);
+    RED.nodes.registerType("coco-tia", CocoPortalProjectParser);
 };
